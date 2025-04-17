@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuramoto模型与振荡器网络学习</title>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 添加平滑滚动效果
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+            
+            // 添加滚动监听，实现元素进入视口时的动画
+            const sections = document.querySelectorAll('.section, .appendix');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+            
+            sections.forEach(section => {
+                observer.observe(section);
+            });
+            
+            // 添加数学公式高亮效果
+            const mathBlocks = document.querySelectorAll('.math-block');
+            mathBlocks.forEach(block => {
+                block.addEventListener('mouseenter', function() {
+                    this.style.background = 'rgba(166, 193, 238, 0.2)';
+                });
+                block.addEventListener('mouseleave', function() {
+                    this.style.background = 'rgba(166, 193, 238, 0.1)';
+                });
+            });
+            
+            // 音频播放器功能
+            const audio = document.getElementById('kuramoto-audio');
+            const playButton = document.getElementById('play-button');
+            const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+            
+            playButton.addEventListener('click', function() {
+                if (audio.paused) {
+                    audio.play();
+                    playButton.innerHTML = pauseIcon;
+                    playButton.setAttribute('aria-label', '暂停音频');
+                } else {
+                    audio.pause();
+                    playButton.innerHTML = playIcon;
+                    playButton.setAttribute('aria-label', '播放音频');
+                }
+            });
+            
+            audio.addEventListener('ended', function() {
+                playButton.innerHTML = playIcon;
+                playButton.setAttribute('aria-label', '播放音频');
+            });
+        });
+    </script>
+</head>
+<body>
+    <nav class="nav-menu">
+        <div class="nav-container">
+            <div class="logo">K</div>
+            <ul class="nav-links">
+                <li><a href="#kuramoto-model">Kuramoto模型</a></li>
+                <li><a href="#equilibrium-propagation">平衡传播训练</a></li>
+                <li><a href="#mnist-performance">MNIST性能</a></li>
+                <li><a href="#appendix">附录</a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="container">
+        <header>
+            <h1>Kuramoto模型与振荡器网络学习</h1>
+            <div class="header-decoration"></div>
+        </header>
+
+        <div class="audio-container">
+            <audio id="kuramoto-audio" src="Kuramoto_full.mp3"></audio>
+            <button id="play-button" class="audio-button" aria-label="播放音频">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </button>
+        </div>
+        
+        <div id="kuramoto-model" class="section">
+            <h2>1. 一般Kuramoto模型</h2>
+            
+            <div class="subsection">
+                <h3>1.1 相耦合振荡器的动力学</h3>
+                <p>在自然界和人工系统中，振荡现象无处不在。从神经元的电活动到超导量子干涉设备，振荡系统展现出丰富的动力学行为。当多个振荡器相互作用时，它们可能会表现出同步行为，即它们的振荡相位趋于一致。</p>
+                
+                <p>Kuramoto模型是描述相耦合振荡器系统的经典模型。在这个模型中，每个振荡器由其相位θᵢ表示，其动力学由以下微分方程描述：</p>
+                
+                <div class="math-block">
+                    dθᵢ/dt = ωᵢ + (K/N)∑ⱼ sin(θⱼ - θᵢ)
+                </div>
+                
+                <p>其中：</p>
+                <ul>
+                    <li>θᵢ是第i个振荡器的相位</li>
+                    <li>ωᵢ是第i个振荡器的固有频率</li>
+                    <li>K是耦合强度</li>
+                    <li>N是振荡器的总数</li>
+                </ul>
+                
+                <p>这个方程表明，每个振荡器的相位变化率由两部分组成：其固有频率ωᵢ和来自其他振荡器的耦合影响。耦合项试图使振荡器的相位差最小化，从而促进同步。</p>
+            </div>
+            
+            <div id="network-sync" class="subsection">
+                <h3>1.2 网络中的振荡器同步</h3>
+                <p>当振荡器在网络中连接时，其同步行为变得更加复杂。网络拓扑结构（即连接模式）对系统的整体动力学有显著影响。在网络Kuramoto模型中，动力学方程修改为：</p>
+                
+                <div class="math-block">
+                    dθᵢ/dt = ωᵢ + ∑ⱼ Kᵢⱼ sin(θⱼ - θᵢ)
+                </div>
+                
+                <p>其中Kᵢⱼ表示振荡器i和j之间的耦合强度，可以用邻接矩阵表示。</p>
+                
+                <p>同步程度通常用序参量r来量化：</p>
+                
+                <div class="math-block">
+                    r e^(iψ) = (1/N)∑ⱼ e^(iθⱼ)
+                </div>
+                
+                <p>其中r∈[0,1]表示同步程度，r=1表示完全同步，r=0表示完全不同步；ψ表示群体的平均相位。</p>
+                
+                <p>在耦合强度K增加时，系统会经历从不同步到部分同步再到完全同步的相变。这种相变行为对于理解复杂系统中的集体现象至关重要。</p>
+            </div>
+        </div>
+        
+        <div id="equilibrium-propagation" class="section">
+            <h2>2. 用平衡传播训练振荡网络</h2>
+            
+            <div id="adapt-kuramoto" class="subsection">
+                <h3>2.1 将Kuramoto模型适应到平衡传播框架</h3>
+                <p>平衡传播（Equilibrium Propagation）是一种训练能量基神经网络的算法，它基于物理系统的动力学。将Kuramoto模型适应到平衡传播框架需要定义一个能量函数，使得系统的动力学对应于能量的梯度下降。</p>
+                
+                <p>对于Kuramoto模型，可以定义以下能量函数：</p>
+                
+                <div class="math-block">
+                    E(θ) = -∑ᵢⱼ Kᵢⱼ cos(θⱼ - θᵢ) - ∑ᵢ ωᵢθᵢ
+                </div>
+                
+                <p>可以验证，对该能量函数求梯度得到的动力学方程与Kuramoto模型一致：</p>
+                
+                <div class="math-block">
+                    dθᵢ/dt = -∂E/∂θᵢ = ωᵢ + ∑ⱼ Kᵢⱼ sin(θⱼ - θᵢ)
+                </div>
+                
+                <p>在平衡传播框架中，训练过程分为两个阶段：</p>
+                <ol>
+                    <li>自由阶段：系统在没有监督信号的情况下演化到平衡状态</li>
+                    <li>弱强制阶段：施加微小的监督信号，系统演化到新的平衡状态</li>
+                </ol>
+                
+                <p>权重更新规则基于这两个平衡状态之间的差异：</p>
+                
+                <div class="math-block">
+                    ΔKᵢⱼ ∝ ∂E/∂Kᵢⱼ(自由阶段) - ∂E/∂Kᵢⱼ(弱强制阶段)
+                </div>
+            </div>
+            
+            <div id="async-learning" class="subsection">
+                <h3>2.2 非同步振荡器网络中的学习</h3>
+                <p>传统的神经网络通常假设神经元的活动是同步的，但生物神经系统中的神经元活动往往是非同步的。基于Kuramoto模型的振荡器网络允许研究非同步条件下的学习。</p>
+                
+                <p>在非同步振荡器网络中，学习规则需要考虑振荡器之间的相位差异。对于连接权重Kᵢⱼ，学习规则可以表示为：</p>
+                
+                <div class="math-block">
+                    ΔKᵢⱼ ∝ &lt;sin(θⱼ - θᵢ)&gt;(自由阶段) - &lt;sin(θⱼ - θᵢ)&gt;(弱强制阶段)
+                </div>
+                
+                <p>其中&lt;·&gt;表示时间平均。</p>
+                
+                <p>这种学习方法允许网络在振荡器不完全同步的情况下学习，更接近生物神经系统的工作方式。</p>
+            </div>
+            
+            <div id="sync-evolution" class="subsection">
+                <h3>2.3 训练过程中同步性和准确性的演变</h3>
+                <p>在训练过程中，振荡器网络的同步性和分类准确性都会发生变化。研究表明，随着训练的进行，网络中振荡器的同步程度通常会增加，这与分类准确性的提高相关。</p>
+                
+                <p>然而，完全同步并不总是最优的。在某些任务中，部分同步状态可能具有更好的计算能力，因为它允许不同的振荡器子群表示不同的特征。</p>
+                
+                <p>训练过程中同步性的演变可以通过序参量r的变化来跟踪。实验表明，在训练初期，r值通常较低，表示振荡器处于较不同步的状态；随着训练进行，r值逐渐增加，表示网络趋向于更同步的状态。</p>
+            </div>
+        </div>
+        
+        <div id="mnist-performance" class="section">
+            <h2>3. MNIST数据库上的性能</h2>
+            
+            <div id="full-sync" class="subsection">
+            
+            <div class="subsection">
+                <h3>3.1 完全同步Kuramoto模型</h3>
+                <p>在完全同步的条件下，Kuramoto模型可以被简化。当所有振荡器的相位接近时，可以使用小角度近似：sin(θⱼ - θᵢ) ≈ θⱼ - θᵢ。这使得模型在数学上更易处理，但可能限制了其表达能力。</p>
+                
+                <p>在MNIST手写数字识别任务上，完全同步的Kuramoto模型表现出一定的分类能力，但准确率有限。实验结果表明，这种模型可以达到约90%的测试准确率，这低于传统神经网络的表现。</p>
+                
+                <p>完全同步模型的优势在于其动力学简单，计算效率高，但其表达能力受到限制。</p>
+            </div>
+            
+            </div>
+            
+            <div id="general-kuramoto" class="subsection">
+                <h3>3.2 一般Kuramoto模型</h3>
+                <p>一般Kuramoto模型允许振荡器处于部分同步状态，保留了非线性动力学的丰富性。在MNIST任务上，一般Kuramoto模型表现出比完全同步模型更好的性能。</p>
+                
+                <p>实验结果表明，一般Kuramoto模型可以达到约95%的测试准确率，接近传统神经网络的表现。这种改进归因于模型保留了非线性动力学，增强了其表达能力。</p>
+                
+                <p>一般Kuramoto模型的挑战在于其训练过程更复杂，需要更精细的参数调整和更长的训练时间。</p>
+            </div>
+            
+            </div>
+            
+            <div id="coupled-model" class="subsection">
+                <h3>3.3 完全同步的耦合振幅-相位模型</h3>
+                <p>为了进一步提高性能，研究者提出了耦合振幅-相位模型，该模型不仅考虑振荡器的相位，还考虑其振幅。动力学方程变为：</p>
+                
+                <div class="math-block">
+                    dθᵢ/dt = ωᵢ + ∑ⱼ Kᵢⱼ rⱼ sin(θⱼ - θᵢ)<br>
+                    drᵢ/dt = (1 - rᵢ²)rᵢ + ∑ⱼ Kᵢⱼ rⱼ cos(θⱼ - θᵢ)
+                </div>
+                
+                <p>其中rᵢ表示第i个振荡器的振幅。</p>
+                
+                <p>在MNIST任务上，这种模型表现出最好的性能，达到约97%的测试准确率，接近传统深度神经网络的表现。这种改进归因于模型增加了表达能力，可以同时利用相位和振幅信息进行计算。</p>
+            </div>
+        </div>
+        
+        <div id="appendix" class="appendix">
+            <h2>附录</h2>
+            
+            <div id="network-arch" class="subsection">
+                <h3>A.1 网络架构和初始化</h3>
+                <p>在实验中，使用了多层振荡器网络。典型的网络架构包括：</p>
+                <ul>
+                    <li>输入层：784个振荡器，对应MNIST图像的784个像素</li>
+                    <li>隐藏层：可变数量的振荡器，通常为100-500个</li>
+                    <li>输出层：10个振荡器，对应10个数字类别</li>
+                </ul>
+                
+                <p>网络权重初始化采用高斯分布，均值为0，标准差为1/√n，其中n是前一层的神经元数量。这种初始化方法有助于保持信号的方差在网络传播过程中相对稳定。</p>
+            </div>
+            
+            <div id="phase-encoding" class="subsection">
+                <h3>A.2 相位域中的数据编码</h3>
+                <p>将MNIST图像数据编码到相位域是一个关键步骤。常用的编码方法包括：</p>
+                
+                <ol>
+                    <li>线性映射：将像素值[0,255]线性映射到相位范围[0,2π]</li>
+                    <li>二值化映射：将像素值二值化后映射到两个相位值，如0映射到0，1映射到π</li>
+                </ol>
+                
+                <p>实验表明，不同的编码方法对模型性能有显著影响。线性映射通常提供更丰富的信息，但二值化映射可能使训练更稳定。</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
